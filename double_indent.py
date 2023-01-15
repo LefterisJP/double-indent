@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Sequence
+from pathlib import Path
+from typing import Sequence, Union
 
-from tokenize_rt import reversed_enumerate
-from tokenize_rt import src_to_tokens
-from tokenize_rt import Token
-from tokenize_rt import tokens_to_src
+from tokenize_rt import Token, reversed_enumerate, src_to_tokens, tokens_to_src
 
 
 def _find_outer_parens(tokens: list[Token]) -> tuple[int, int]:
@@ -108,7 +106,7 @@ def _fix_src(contents_text: str, indent: int) -> str:
     return tokens_to_src(tokens)
 
 
-def _fix_file(filename: str, args: argparse.Namespace) -> int:
+def _fix_file(filename: Path, args: argparse.Namespace) -> int:
     if filename == '-':
         contents = sys.stdin.buffer.read().decode()
     else:
@@ -128,9 +126,24 @@ def _fix_file(filename: str, args: argparse.Namespace) -> int:
     return contents_text != contents_orig
 
 
+def _process_file_or_directory(
+        file_or_dir: Union[str, Path],
+        args: argparse.Namespace,
+) -> int:
+    path = Path(file_or_dir)
+    ret = 0
+    if path.is_dir():
+        for child in path.iterdir():
+            ret |= _process_file_or_directory(child, args)
+    elif path.suffix == '.py':
+        ret |= _fix_file(path, args)
+
+    return ret
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument('filenames', nargs='*')
+    parser.add_argument('input_data', nargs='*')
     parser.add_argument(
         '-i', '--indent',
         default=4,
@@ -139,8 +152,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     ret = 0
-    for filename in args.filenames:
-        ret |= _fix_file(filename, args=args)
+    for entry in args.input_data:
+        ret |= _process_file_or_directory(entry, args=args)
 
     return ret
 
