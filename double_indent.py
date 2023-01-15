@@ -119,9 +119,12 @@ def _fix_file(filename: Path, args: argparse.Namespace) -> int:
     if filename == '-':
         print(contents_text, end='')
     elif contents_text != contents_orig:
-        print(f'Rewriting {filename}', file=sys.stderr)
-        with open(filename, 'wb') as f:
-            f.write(contents_text.encode())
+        if args.dry_run is False:
+            print(f'Rewriting {filename}', file=sys.stderr)
+            with open(filename, 'wb') as f:
+                f.write(contents_text.encode())
+        else:
+            print(f'Would rewrite {filename}')
 
     return contents_text != contents_orig
 
@@ -149,6 +152,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=4,
         type=int,
         help='number of spaces for indentation',
+    )
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        default=False,
+        help='do not modify anything, just print if any file would have changes',
     )
     args = parser.parse_args(argv)
     ret = 0
