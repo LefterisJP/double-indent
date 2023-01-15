@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import operator
 import sys
 from pathlib import Path
-from typing import Sequence, Union
+from typing import Callable, Sequence, Union
 
 from tokenize_rt import Token, reversed_enumerate, src_to_tokens, tokens_to_src
 
@@ -45,6 +46,24 @@ def _is_multiline_def(tokens: list[Token], start: int) -> bool:
         raise AssertionError('past end')
 
 
+def _analyze_line(
+        tokens: list[Token],
+        idx: int,
+        op: Callable,
+) -> bool:
+    line = tokens[idx].line
+    has_type_hint = False
+    has_comma = False
+    while tokens[idx].line == line:
+        if tokens[idx].name == 'OP' and tokens[idx].src == ':':
+            has_type_hint = True
+        elif tokens[idx].name == 'OP' and tokens[idx].src == ',':
+            has_comma = True
+        idx = op(idx, 1)
+
+    return has_type_hint, has_comma
+
+
 def _fix_indent(
         tokens: list[Token],
         start: int,
@@ -53,9 +72,20 @@ def _fix_indent(
         offset: int,
 ) -> None:
     idx = start
+    open_type_hint = False
     while idx < end:
         if tokens[idx].name == 'NL':
+            if open_type_hint is False:
+                # current line was an arg with type hint and no comma, so type hint def is open
+                has_type_hint, has_comma = _analyze_line(tokens, idx, operator.sub)
+                open_type_hint = has_type_hint and not has_comma
+            else:
+                has_type_hint, has_comma = _analyze_line(tokens, idx + 1, operator.add)
+                if has_type_hint:  # an open type hint definition has closed
+                    open_type_hint = False
+
             if (
+                    not open_type_hint and  # handle the case when multiline indented type hints were also moved
                     tokens[idx + 1].name == 'UNIMPORTANT_WS' and
                     len(tokens[idx + 1].src) != (indent * 2) + offset and
                     # another argument must follow
