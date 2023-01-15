@@ -13,7 +13,7 @@ We forked it to add additional functionality that the original author did not wa
 ## usage
 
 ```console
-usage: double-indent-rotki [-h] [-i INDENT] [filenames ...]
+usage: double-indent [-h] [-i INDENT] [filenames ...]
 
 positional arguments:
   filenames
